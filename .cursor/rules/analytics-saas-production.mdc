@@ -1,0 +1,875 @@
+---
+alwaysApply: true
+---
+
+Rule: Analytics SaaS Production Backend Standards (NestJS)
+
+Purpose:
+
+Maintain a clean, scalable, observable, multi-tenant analytics SaaS backend.  
+Prevent architectural drift, data corruption, security leaks, and metric instability.
+
+Scope:
+
+This rule applies to the **NestJS analytics backend** only. It does not replace frontend (Next.js `app/`) or shared UI rules.
+
+Maturity:
+
+Meet this standard **before production**. Early phases may temporarily simplify (for example schema registry depth, metric definition ceremony, or coverage targets) **only** when the gap is documented in the module README or PR and has a tracked follow-up to full compliance.
+
+Core principles:
+
+Clarity over cleverness
+Consistency over speed
+Separation over convenience
+Data safety over shortcuts
+Observability over assumptions
+
+
+------------------------------------------------
+
+ARCHITECTURE LAYERS
+
+System must follow:
+
+Controller → Service → Repository → Database
+
+Workers operate outside request flow.
+
+Controllers:
+
+Handle HTTP only.
+Validate input.
+Call services.
+Return responses.
+
+Controllers must not:
+
+Contain business logic
+Access repositories directly
+Execute SQL
+Call workers directly
+
+Controllers may:
+
+Call services that trigger jobs.
+
+
+------------------------------------------------
+
+MODULE DESIGN
+
+Modules must be domain driven.
+
+Core modules:
+
+auth
+users
+workspaces
+datasources
+events
+metrics
+dashboards
+api-keys
+alerts
+billing
+
+Shared modules:
+
+config
+database
+logger
+guards
+decorators
+
+Rules:
+
+Modules communicate through exported services only.
+Avoid circular dependencies.
+
+Preferred dependency flow:
+
+workspaces → events → metrics → dashboards
+
+Exceptions allowed if documented.
+
+
+------------------------------------------------
+
+MULTI TENANCY RULES
+
+All business data belongs to a workspace.
+
+Required fields:
+
+id
+workspaceId
+createdAt
+updatedAt
+
+Queries must filter by workspace unless:
+
+System admin context
+Internal workers
+Migration scripts
+
+Workspace bypass must always be explicit.
+
+
+------------------------------------------------
+
+EVENT SYSTEM RULES
+
+Events are immutable history.
+
+Allowed:
+
+Insert events.
+
+Forbidden:
+
+Updating events
+Deleting events outside retention policies
+
+Events must include:
+
+workspaceId
+eventName
+timestamp
+sourceId
+
+Events must support deduplication using:
+
+eventId
+idempotencyKey
+hash
+
+System must accept late arriving data.
+
+Never rely on insertion order.
+
+Always rely on event timestamp.
+
+
+------------------------------------------------
+
+EVENT SCHEMA CONTRACT RULES
+
+Event schemas are permanent contracts once used.
+
+Events must define:
+
+eventName
+description
+required properties
+optional properties
+property types
+
+Rules:
+
+Never change meaning of properties.
+Never change property types.
+Never reuse property names.
+
+Allowed:
+
+Adding optional fields.
+Adding new events.
+
+Forbidden:
+
+Removing required properties.
+Changing types.
+Renaming properties without transition.
+
+Breaking changes require:
+
+New event version.
+New event name.
+
+Example:
+
+user_signup
+user_signup_v2
+
+Event validation required.
+
+Invalid events must:
+
+Be rejected
+Or stored separately
+
+Schema registry recommended:
+
+events/schema/
+
+Purpose:
+
+Prevent silent metric corruption.
+
+
+------------------------------------------------
+
+DATA PROCESSING RULES
+
+Metrics must be precomputed.
+
+Correct flow:
+
+events → workers → aggregations → metrics tables
+
+Never compute heavy metrics in request path.
+
+Reason:
+
+Protect API latency.
+
+
+------------------------------------------------
+
+METRIC DEFINITION RULES
+
+Metrics must be explicitly defined.
+
+Metric definitions must include:
+
+Name
+Description
+SQL definition
+Data source
+Refresh frequency
+Owner
+
+Metrics must be reproducible.
+
+Metric calculations must:
+
+Use aggregation tables
+Not raw event scans
+
+Metric changes must be versioned.
+
+Never silently change metric formulas.
+
+
+------------------------------------------------
+
+BACKGROUND JOB RULES
+
+Workers handle:
+
+Aggregation
+Connector sync
+Forecasting
+Backfills
+Large imports
+
+Workers must be:
+
+Retry safe
+Idempotent
+Observable
+
+Workers must track:
+
+Start time
+End time
+Retry attempts
+Failure cause
+
+Workers must never block API requests.
+
+
+------------------------------------------------
+
+DATA BACKFILL RULES
+
+Backfills must be safe.
+
+Rules:
+
+Backfills must run as jobs.
+Backfills must be resumable.
+Backfills must not block ingestion.
+
+Backfills must:
+
+Track progress
+Support restart
+Log impact
+
+Never:
+
+Lock event tables
+Block production traffic
+
+Always:
+
+Batch operations.
+
+
+------------------------------------------------
+
+TRANSACTION RULES
+
+Use transactions when:
+
+Updating multiple related tables
+Billing updates
+Subscription changes
+Credit accounting
+
+Avoid transactions for:
+
+Event ingestion
+Logging
+Simple inserts
+
+Rules:
+
+Keep short.
+Never call external APIs inside transactions.
+
+
+------------------------------------------------
+
+DATABASE RULES
+
+Schema changes require migrations.
+
+Rules:
+
+Forward only migrations.
+Never modify applied migrations.
+Must be idempotent.
+
+Breaking schema change process:
+
+Add new column
+Migrate data
+Switch code
+Remove old column later
+
+Zero downtime rule:
+
+Deploy compatible code first.
+
+Event tables must index:
+
+workspaceId
+timestamp
+eventName
+
+
+------------------------------------------------
+
+API DESIGN RULES
+
+All endpoints must:
+
+Use DTO validation
+Use proper HTTP codes
+Return consistent format
+
+Success:
+
+{
+  success: true,
+  data: {}
+}
+
+Error:
+
+{
+  success: false,
+  error: "",
+  message: ""
+}
+
+
+------------------------------------------------
+
+API CONTRACT RULES
+
+API contracts are permanent once released.
+
+Breaking changes require:
+
+New version
+Migration guide
+Deprecation notice
+Transition window
+
+Breaking changes include:
+
+Removing fields
+Renaming fields
+Changing types
+Changing response structure
+Changing auth behavior
+
+Allowed changes:
+
+Adding optional fields
+Adding endpoints
+Expanding enums
+Relaxing validation
+
+Never:
+
+Remove required fields in same version.
+Change response shape silently.
+Change error formats without versioning.
+
+Consistency rules:
+
+Same error structure.
+Same pagination structure.
+Same naming patterns.
+
+Responses must remain deterministic.
+
+
+------------------------------------------------
+
+API VERSIONING RULES
+
+Version pattern:
+
+/v1/events
+/v1/metrics
+
+Rules:
+
+Support minimum 12 months.
+6 month deprecation notice.
+
+Never:
+
+Change behavior silently.
+
+Always:
+
+Create new version.
+
+
+------------------------------------------------
+
+RATE LIMITING RULES
+
+Protect all public APIs.
+
+Apply limits to:
+
+Auth endpoints
+Event ingestion
+Public APIs
+
+Limits must support:
+
+IP
+API key
+Workspace
+
+System must:
+
+Return 429
+Fail gracefully
+Never crash
+
+
+------------------------------------------------
+
+SECURITY RULES
+
+Authentication:
+
+JWT expiration required.
+Refresh tokens required.
+Token rotation required.
+
+Authorization:
+
+RBAC required.
+Permissions checked in service layer.
+
+Never trust:
+
+workspaceId from client
+roles from frontend
+
+Always verify server side.
+
+Data protection:
+
+Encrypt:
+
+API keys
+Tokens
+Credentials
+
+Never log:
+
+Passwords
+Tokens
+Payment data
+PII
+
+Database safety:
+
+Parameterized queries only.
+
+Never build SQL strings.
+
+Secrets:
+
+Environment or secret manager only.
+
+Never commit secrets.
+
+
+------------------------------------------------
+
+IDEMPOTENCY RULES
+
+Operations must be retry safe.
+
+Required for:
+
+Event ingestion
+Webhooks
+Billing updates
+Workers
+
+Strategies:
+
+Idempotency keys
+Unique constraints
+Deduplication
+
+Workers must assume retries.
+
+
+------------------------------------------------
+
+ERROR HANDLING RULES
+
+Use structured errors.
+
+Types:
+
+Validation
+Domain
+Infrastructure
+
+Domain error examples:
+
+InsufficientCreditsError
+InvalidWorkspaceStateError
+
+Never expose stack traces.
+
+
+------------------------------------------------
+
+LOGGING RULES
+
+Use structured logging.
+
+Log:
+
+Errors
+Job failures
+Security events
+Connector failures
+
+Never log:
+
+Secrets
+Tokens
+Credentials
+PII
+
+
+------------------------------------------------
+
+OBSERVABILITY RULES
+
+System must be measurable.
+
+Expose:
+
+GET /health
+GET /health/ready
+GET /health/live
+
+Track:
+
+Latency
+Error rates
+Queue backlog
+Job duration
+DB query time
+
+Critical logs must include:
+
+workspaceId
+requestId
+correlationId
+operation
+duration
+
+Never deploy blind systems.
+
+
+------------------------------------------------
+
+PERFORMANCE RULES
+
+Never load large datasets into memory.
+
+Always use:
+
+SQL aggregation
+Indexes
+Pagination
+Precomputation
+
+Bad:
+
+Load 1M rows into JS.
+
+Good:
+
+Aggregate in database.
+
+
+------------------------------------------------
+
+TESTING RULES
+
+Coverage targets:
+
+Auth:
+90%
+
+Event ingestion:
+90%
+
+Billing:
+90%
+
+Metrics:
+85%
+
+Core services:
+80%
+
+Required tests:
+
+Unit:
+
+Services
+Validators
+
+Integration:
+
+Repositories
+APIs
+
+E2E:
+
+Auth flow
+Event ingestion
+Metrics flow
+
+Critical modules must not merge without tests.
+
+
+------------------------------------------------
+
+DOCUMENTATION RULES
+
+APIs must include:
+
+Swagger docs
+Examples
+Error cases
+
+Modules must include README:
+
+Purpose
+Responsibilities
+Dependencies
+
+Complex logic must explain why.
+
+Architecture decisions must be documented when changing:
+
+Data flow
+Pipelines
+Tenancy model
+
+
+------------------------------------------------
+
+CONNECTOR RELIABILITY RULES
+
+External connectors must assume failure.
+
+Required:
+
+Retries with backoff
+Timeout protection
+Partial sync handling
+
+Connectors must track:
+
+Last sync time
+Sync status
+Failure reason
+
+Never assume external APIs are reliable.
+
+
+------------------------------------------------
+
+FEATURE ADDITION RULE
+
+New features must include:
+
+Module
+Service
+DTO
+Entity
+Controller
+Tests
+Documentation
+
+Never place logic in unrelated modules.
+
+
+------------------------------------------------
+
+
+------------------------------------------------
+
+COST CONTROL RULES
+
+System must prevent unbounded resource usage.
+
+All expensive operations must have limits.
+
+DATABASE QUERY LIMITS
+
+Queries must enforce:
+
+Default row limits (max 10,000 unless justified)
+Query timeout (default 30 seconds)
+Pagination for large datasets
+
+Complex queries must:
+
+Use EXPLAIN before approval
+Avoid full table scans unless indexed
+Require review if scanning large event tables
+
+Forbidden:
+
+Unbounded SELECT queries
+Queries without workspace filters
+Queries without limits on event tables
+
+
+EVENT INGESTION LIMITS
+
+Ingestion must enforce:
+
+Maximum batch size
+Maximum request payload size
+Maximum events per request
+Rate limits per workspace
+
+System must reject:
+
+Oversized batches
+Malformed payloads
+Abnormally large property objects
+
+System must monitor:
+
+Events per workspace
+Storage growth rate
+Ingestion spikes
+
+
+QUERY PERFORMANCE CONTROL
+
+New complex queries must:
+
+Include explain plan review
+Verify index usage
+Avoid cross joins on large tables
+
+Query complexity scoring recommended using:
+
+Estimated rows
+Join count
+Aggregation cost
+
+High cost queries must:
+
+Require optimization
+Use pre-aggregations
+Use caching where possible
+
+
+COST ATTRIBUTION RULES
+
+System must track cost drivers per workspace:
+
+Storage usage
+Event volume
+Query compute usage
+Connector sync usage
+Data export volume
+
+System must support:
+
+Workspace usage tracking
+Cost anomaly alerts
+Internal cost reporting
+
+Recommended:
+
+Expose usage metrics to customers.
+
+Examples:
+
+Event volume usage
+Storage consumption
+API usage
+
+Purpose:
+
+Prevent hidden cost growth.
+Enable usage-based pricing.
+Protect platform sustainability.
+
+------------------------------------------------
+
+FINAL OPERATING STANDARD
+
+System must always remain:
+
+Modular
+Observable
+Tenant safe
+Secure
+Tested
+Predictable
+Extendable
+Recoverable
+
+If a feature reduces clarity or safety,
+it must be redesigned before merging.
