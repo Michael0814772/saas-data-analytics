@@ -87,6 +87,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (status === HttpStatus.TOO_MANY_REQUESTS) {
       return 'RATE_LIMITED'
     }
+    if (status === HttpStatus.CONFLICT) {
+      return 'CONFLICT'
+    }
     return 'HTTP_ERROR'
   }
 }

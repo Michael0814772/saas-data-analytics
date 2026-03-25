@@ -5,6 +5,9 @@ import { join } from 'path'
 import type { AppConfig } from '../shared/config/configuration'
 import { RefreshToken } from '../modules/auth/entities/refresh-token.entity'
 import { User } from '../modules/users/entities/user.entity'
+import { WorkspaceInvite } from '../modules/workspaces/entities/workspace-invite.entity'
+import { WorkspaceMember } from '../modules/workspaces/entities/workspace-member.entity'
+import { Workspace } from '../modules/workspaces/entities/workspace.entity'
 
 @Module({
   imports: [
@@ -23,7 +26,7 @@ import { User } from '../modules/users/entities/user.entity'
           username: db.user,
           password: db.password,
           database: db.name,
-          entities: [User, RefreshToken],
+          entities: [User, RefreshToken, Workspace, WorkspaceMember, WorkspaceInvite],
           migrations: [join(__dirname, 'migrations', '*.js')],
           migrationsRun: true,
           synchronize: nodeEnv === 'development' && process.env.TYPEORM_SYNC === 'true',
