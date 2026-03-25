@@ -29,6 +29,9 @@ services:
       DATABASE_USER: postgres
       DATABASE_PASSWORD: postgres
       DATABASE_NAME: analytics
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-please-set-jwt-access-secret}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
     depends_on:
       postgres:
         condition: service_healthy
