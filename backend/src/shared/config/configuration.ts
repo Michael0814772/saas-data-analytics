@@ -10,6 +10,11 @@ export type AppConfig = {
     password: string
     name: string
   }
+  jwt: {
+    accessSecret: string
+    accessExpiresIn: string
+    refreshExpiresIn: string
+  }
 }
 
 export const configuration = registerAs(
@@ -23,6 +28,11 @@ export const configuration = registerAs(
       user: process.env.DATABASE_USER ?? 'postgres',
       password: process.env.DATABASE_PASSWORD ?? 'postgres',
       name: process.env.DATABASE_NAME ?? 'analytics',
+    },
+    jwt: {
+      accessSecret: process.env.JWT_ACCESS_SECRET ?? 'dev-access-secret-change-me',
+      accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
+      refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
     },
   }),
 )
