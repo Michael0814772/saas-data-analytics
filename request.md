@@ -40,6 +40,12 @@ When the token is **not** returned from the API, the server **logs** in non-prod
 |----------|---------|
 | `EVENT_IDEMPOTENCY_TTL_HOURS` | How long a given `x-idempotency-key` + event payload is treated as already-processed (default **72** hours). After expiry, the same key can be reused. |
 
+### Cost protection (backend)
+
+| Variable | Purpose |
+|----------|---------|
+| `COST_MAX_EVENTS_PER_WORKSPACE_PER_DAY` | Daily workspace event insert limit (UTC day). When exceeded, ingestion returns **429** with `error: EVENT_LIMIT_EXCEEDED`. |
+
 ### Event schema registry (backend)
 
 | Variable | Purpose |
@@ -58,6 +64,7 @@ Root-level app and health checks. **Public** (no JWT).
 | `GET` | `/v1/health` | — | Simple health check; returns `{ "status": "ok" }` in `data`. |
 | `GET` | `/v1/health/live` | — | **Liveness** probe (process up; no dependency checks). |
 | `GET` | `/v1/health/ready` | — | **Readiness** probe (checks DB, and Redis if configured). |
+| `GET` | `/v1/docs` | — | Swagger UI (enabled when `SWAGGER_ENABLED=true`, dev default). |
 
 ---
 
@@ -123,6 +130,24 @@ Notes:
 
 ---
 
+## DatasourcesController (Postgres connector)
+
+Base path: **`/v1/workspaces/datasources`**.
+
+All routes require:
+- `Authorization: Bearer <access_token>`
+- `x-workspace-id: <uuid>`
+- caller must be a member of that workspace
+
+| Method | Path | Body (JSON) | What it does |
+|--------|------|-------------|---------------|
+| `POST` | `/v1/workspaces/datasources` | `{ \"type\": \"postgres\", \"config\": { host, port, user, password, database, ssl? } }` | Creates a datasource record (connection test is separate). |
+| `POST` | `/v1/workspaces/datasources/:id/test-connection` | — | Verifies the datasource can connect to Postgres and runs `SELECT 1`. Updates `status`. |
+| `POST` | `/v1/workspaces/datasources/:id/sample-query` | — | Runs a small sample query (database/user/now). Updates `status` on failure. |
+| `POST` | `/v1/workspaces/datasources/:id/sync` | — | Triggers a minimal Phase-1 sync (connection validation + `lastSync`). |
+
+---
+
 ## Quick reference by controller
 
 | Controller | Prefix | Purpose |
@@ -132,6 +157,7 @@ Notes:
 | `WorkspacesController` | `/v1/workspaces` | Workspaces, invites, members, context (tenant via `x-workspace-id`) |
 | `ApiKeysController` | `/v1/workspaces/api-keys` | API key lifecycle (create/list/revoke) |
 | `MetricsController` | `/v1/metrics` | Dashboard metrics (reads aggregates only; tenant via `x-workspace-id`) |
+| `DatasourcesController` | `/v1/workspaces/datasources` | Postgres connector config + tests + sync |
 
 ---
 
