@@ -9,6 +9,8 @@ import { SharedConfigModule } from './shared/config/shared-config.module'
 import { EventsModule } from './modules/events/events.module'
 import { JobsModule } from './modules/jobs/jobs.module'
 import { MetricsModule } from './modules/metrics/metrics.module'
+import { DatasourcesModule } from './modules/datasources/datasources.module'
+import { CostModule } from './modules/cost/cost.module'
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { MetricsModule } from './modules/metrics/metrics.module'
     EventsModule,
     JobsModule,
     MetricsModule,
+    DatasourcesModule,
+    CostModule,
   ],
   controllers: [AppController],
   providers: [AppService],

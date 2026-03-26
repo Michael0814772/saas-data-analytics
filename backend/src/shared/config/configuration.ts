@@ -25,6 +25,10 @@ export type AppConfig = {
   http: {
     trustProxyHops: number | null
   }
+  cors: {
+    /** Comma-separated allowed origins. Empty = disable CORS. */
+    origins: string[]
+  }
   /** Set `REDIS_URL` to use Redis for auth rate-limit storage across multiple API instances. */
   redis: {
     url: string | null
@@ -56,6 +60,14 @@ export type AppConfig = {
   jobs: {
     /** Whether to enable BullMQ workers inside this process (requires REDIS_URL). */
     enableWorkers: boolean
+  }
+  cost: {
+    /** Max events inserted per workspace per UTC day. */
+    maxEventsPerWorkspacePerDay: number
+  }
+  swagger: {
+    /** Enable Swagger UI (dev default true). */
+    enabled: boolean
   }
 }
 
@@ -116,6 +128,44 @@ const parseJobsEnableWorkers = (): boolean => {
   return (process.env.NODE_ENV ?? 'development') !== 'test'
 }
 
+const parseCorsOrigins = (): string[] => {
+  const raw = process.env.CORS_ORIGINS?.trim()
+  if (raw) {
+    return raw
+      .split(',')
+      .map((x) => x.trim())
+      .filter(Boolean)
+  }
+  // Dev default so the dashboard on :3001 can call the API on :3000.
+  if ((process.env.NODE_ENV ?? 'development') !== 'production') {
+    return ['http://localhost:3001']
+  }
+  return []
+}
+
+const parseMaxEventsPerWorkspacePerDay = (): number => {
+  const raw = process.env.COST_MAX_EVENTS_PER_WORKSPACE_PER_DAY?.trim()
+  if (!raw) {
+    return 250_000
+  }
+  const n = parseInt(raw, 10)
+  if (!Number.isFinite(n) || n <= 0) {
+    return 250_000
+  }
+  return n
+}
+
+const parseSwaggerEnabled = (): boolean => {
+  const raw = process.env.SWAGGER_ENABLED?.trim()
+  if (raw === 'true') {
+    return true
+  }
+  if (raw === 'false') {
+    return false
+  }
+  return (process.env.NODE_ENV ?? 'development') !== 'production'
+}
+
 export const configuration = registerAs(
   'app',
   (): AppConfig => ({
@@ -123,6 +173,9 @@ export const configuration = registerAs(
     nodeEnv: process.env.NODE_ENV ?? 'development',
     http: {
       trustProxyHops: parseTrustProxyHops(),
+    },
+    cors: {
+      origins: parseCorsOrigins(),
     },
     redis: {
       url: process.env.REDIS_URL?.trim() || null,
@@ -149,6 +202,12 @@ export const configuration = registerAs(
     },
     jobs: {
       enableWorkers: parseJobsEnableWorkers(),
+    },
+    cost: {
+      maxEventsPerWorkspacePerDay: parseMaxEventsPerWorkspacePerDay(),
+    },
+    swagger: {
+      enabled: parseSwaggerEnabled(),
     },
   }),
 )
