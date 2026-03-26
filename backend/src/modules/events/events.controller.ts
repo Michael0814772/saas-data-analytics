@@ -89,6 +89,7 @@ export class EventsController {
       apiKeyContext: req.apiKeyContext,
       idempotencyKeyHeader,
       inputEvents,
+      payloadBytes,
     })
 
     this.logger.log(

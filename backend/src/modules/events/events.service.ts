@@ -8,6 +8,7 @@ import { EventIdempotencyKeysRepository } from './event-idempotency-keys.reposit
 import type { IngestEventInput } from './types/ingest-event-input.type'
 import { createHash } from 'crypto'
 import type { AppConfig } from '../../shared/config/configuration'
+import { CostRepository } from '../cost/cost.repository'
 
 type IngestResult = {
   inserted: number
@@ -26,6 +27,7 @@ export class EventsService {
     private readonly config: ConfigService,
     private readonly events: EventsRepository,
     private readonly idempotencyKeys: EventIdempotencyKeysRepository,
+    private readonly cost: CostRepository,
   ) {}
 
   async ingestFromApiKey(params: {
@@ -33,6 +35,7 @@ export class EventsService {
     apiKeyContext: ApiKeyContext
     idempotencyKeyHeader: string
     inputEvents: IngestEventInput[]
+    payloadBytes?: number
   }): Promise<IngestResult> {
     const workspaceId = params.apiKeyContext.workspaceId
     const sourceId = params.apiKeyContext.sourceId
@@ -98,6 +101,25 @@ export class EventsService {
       const inserted = eventsToInsert.length
       const deduped = totalReceived - inserted
 
+      if (inserted > 0) {
+        const day = now.toISOString().slice(0, 10)
+        const maxPerDay =
+          this.config.get<AppConfig['cost']['maxEventsPerWorkspacePerDay']>(
+            'app.cost.maxEventsPerWorkspacePerDay',
+            { infer: true },
+          ) ?? 250_000
+        const usage = await this.cost.getForDay({ manager, workspaceId, date: day })
+        if (usage.eventsInserted + inserted > maxPerDay) {
+          this.logger.warn(
+            `events.cost_limit_exceeded workspaceId=${workspaceId} day=${day} current=${usage.eventsInserted} attempted=${inserted} max=${maxPerDay}`,
+          )
+          throw new BadRequestException({
+            error: 'EVENT_LIMIT_EXCEEDED',
+            message: 'Workspace daily event limit exceeded',
+          })
+        }
+      }
+
       if (eventsToInsert.length > 0) {
         const values = eventsToInsert.map((x) => ({
           workspaceId,
@@ -109,6 +131,15 @@ export class EventsService {
         }))
 
         await this.events.bulkInsert(values as any, manager)
+
+        const day = now.toISOString().slice(0, 10)
+        await this.cost.incrementForDay({
+          manager,
+          workspaceId,
+          date: day,
+          eventsInserted: inserted,
+          bytesReceived: Math.max(0, Math.floor(params.payloadBytes ?? 0)),
+        })
       }
 
       this.logger.log(
