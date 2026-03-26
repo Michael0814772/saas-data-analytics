@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { IsNull, Repository } from 'typeorm'
 import { WorkspaceInvite } from './entities/workspace-invite.entity'
 
 @Injectable()
 export class WorkspaceInviteRepository {
+  private readonly logger = new Logger(WorkspaceInviteRepository.name)
+
   constructor(
     @InjectRepository(WorkspaceInvite)
     private readonly repo: Repository<WorkspaceInvite>,
@@ -18,6 +20,7 @@ export class WorkspaceInviteRepository {
     expiresAt: Date
     invitedByUserId: string
   }): Promise<WorkspaceInvite> {
+    this.logger.debug(`workspaces.invites.repo.create workspaceId=${data.workspaceId}`)
     const row = this.repo.create({
       workspaceId: data.workspaceId,
       email: data.email,
@@ -30,6 +33,7 @@ export class WorkspaceInviteRepository {
   }
 
   async findPendingByTokenHash(tokenHash: string): Promise<WorkspaceInvite | null> {
+    this.logger.debug(`workspaces.invites.repo.findByTokenHash`)
     return this.repo.findOne({
       where: { tokenHash, acceptedAt: IsNull() },
       relations: { workspace: true },
@@ -40,6 +44,7 @@ export class WorkspaceInviteRepository {
     workspaceId: string,
     email: string,
   ): Promise<WorkspaceInvite | null> {
+    this.logger.debug(`workspaces.invites.repo.findByWorkspaceAndEmail workspaceId=${workspaceId}`)
     return this.repo.findOne({
       where: {
         workspaceId,
@@ -50,6 +55,7 @@ export class WorkspaceInviteRepository {
   }
 
   async listPendingByWorkspace(workspaceId: string): Promise<WorkspaceInvite[]> {
+    this.logger.debug(`workspaces.invites.repo.listPending workspaceId=${workspaceId}`)
     return this.repo.find({
       where: { workspaceId, acceptedAt: IsNull() },
       order: { createdAt: 'DESC' },
@@ -57,6 +63,22 @@ export class WorkspaceInviteRepository {
   }
 
   async markAccepted(id: string, acceptedAt: Date): Promise<void> {
+    this.logger.debug(`workspaces.invites.repo.markAccepted inviteId=${id}`)
     await this.repo.update({ id }, { acceptedAt })
+  }
+
+  async findPendingByIdAndWorkspace(
+    inviteId: string,
+    workspaceId: string,
+  ): Promise<WorkspaceInvite | null> {
+    this.logger.debug(`workspaces.invites.repo.findById inviteId=${inviteId}`)
+    return this.repo.findOne({
+      where: { id: inviteId, workspaceId, acceptedAt: IsNull() },
+    })
+  }
+
+  async deleteById(id: string): Promise<void> {
+    this.logger.debug(`workspaces.invites.repo.delete inviteId=${id}`)
+    await this.repo.delete({ id })
   }
 }

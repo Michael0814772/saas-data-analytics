@@ -5,7 +5,7 @@ export class Workspaces1742570000000 implements MigrationInterface {
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
-      CREATE TABLE "workspaces" (
+      CREATE TABLE IF NOT EXISTS "workspaces" (
         "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "name" character varying NOT NULL,
         "created_by_user_id" uuid,
@@ -16,7 +16,7 @@ export class Workspaces1742570000000 implements MigrationInterface {
       )
     `)
     await queryRunner.query(`
-      CREATE TABLE "workspace_members" (
+      CREATE TABLE IF NOT EXISTS "workspace_members" (
         "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "workspace_id" uuid NOT NULL,
         "user_id" uuid NOT NULL,
@@ -31,13 +31,13 @@ export class Workspaces1742570000000 implements MigrationInterface {
       )
     `)
     await queryRunner.query(
-      `CREATE INDEX "IDX_workspace_members_workspace_id" ON "workspace_members" ("workspace_id")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_workspace_members_workspace_id" ON "workspace_members" ("workspace_id")`,
     )
     await queryRunner.query(
-      `CREATE INDEX "IDX_workspace_members_user_id" ON "workspace_members" ("user_id")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_workspace_members_user_id" ON "workspace_members" ("user_id")`,
     )
     await queryRunner.query(`
-      CREATE TABLE "workspace_invites" (
+      CREATE TABLE IF NOT EXISTS "workspace_invites" (
         "id" uuid NOT NULL DEFAULT gen_random_uuid(),
         "workspace_id" uuid NOT NULL,
         "email" character varying NOT NULL,
@@ -55,20 +55,20 @@ export class Workspaces1742570000000 implements MigrationInterface {
       )
     `)
     await queryRunner.query(
-      `CREATE INDEX "IDX_workspace_invites_workspace_id" ON "workspace_invites" ("workspace_id")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_workspace_invites_workspace_id" ON "workspace_invites" ("workspace_id")`,
     )
     await queryRunner.query(
-      `CREATE INDEX "IDX_workspace_invites_email_workspace" ON "workspace_invites" ("workspace_id", "email")`,
+      `CREATE INDEX IF NOT EXISTS "IDX_workspace_invites_email_workspace" ON "workspace_invites" ("workspace_id", "email")`,
     )
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX "IDX_workspace_invites_email_workspace"`)
-    await queryRunner.query(`DROP INDEX "IDX_workspace_invites_workspace_id"`)
-    await queryRunner.query(`DROP TABLE "workspace_invites"`)
-    await queryRunner.query(`DROP INDEX "IDX_workspace_members_user_id"`)
-    await queryRunner.query(`DROP INDEX "IDX_workspace_members_workspace_id"`)
-    await queryRunner.query(`DROP TABLE "workspace_members"`)
-    await queryRunner.query(`DROP TABLE "workspaces"`)
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workspace_invites_email_workspace"`)
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workspace_invites_workspace_id"`)
+    await queryRunner.query(`DROP TABLE IF EXISTS "workspace_invites"`)
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workspace_members_user_id"`)
+    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_workspace_members_workspace_id"`)
+    await queryRunner.query(`DROP TABLE IF EXISTS "workspace_members"`)
+    await queryRunner.query(`DROP TABLE IF EXISTS "workspaces"`)
   }
 }

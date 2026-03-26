@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
+import { WorkspaceRole } from '../../shared/enums/workspace-role.enum'
 import { Workspace } from './entities/workspace.entity'
 import { WorkspaceMember } from './entities/workspace-member.entity'
 
@@ -82,5 +83,19 @@ export class WorkspaceMemberRepository {
         role: r.role,
         joinedAt: r.createdAt,
       }))
+  }
+
+  async countOwners(workspaceId: string): Promise<number> {
+    return this.repo.count({
+      where: { workspaceId, role: WorkspaceRole.OWNER },
+    })
+  }
+
+  async updateRole(workspaceId: string, userId: string, role: string): Promise<void> {
+    await this.repo.update({ workspaceId, userId }, { role })
+  }
+
+  async deleteByWorkspaceAndUser(workspaceId: string, userId: string): Promise<void> {
+    await this.repo.delete({ workspaceId, userId })
   }
 }
