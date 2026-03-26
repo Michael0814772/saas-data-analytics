@@ -146,6 +146,8 @@ Never update events.
 Idempotency keys may expire after a defined window (example: 24–72 hours).
 Old keys may be cleaned by a background job.
 
+TODO (later): implement a scheduled cleanup worker/job to delete expired rows from the idempotency-key store (e.g. `event_idempotency_keys`) and add basic monitoring/metrics so it can’t grow unbounded.
+
 Reason:
 Prevents unbounded index growth. Most systems only guarantee idempotency for a retry window, not forever.
 
@@ -221,6 +223,8 @@ Job monitoring
 
 Result:
 Processing layer ready.
+
+TODO (later): run workers as a separate process/service (do not run API + workers in the same container for production scaling).
 
 
 STEP 10 — Basic aggregation engine
