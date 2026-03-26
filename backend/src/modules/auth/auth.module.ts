@@ -4,9 +4,11 @@ import { JwtModule } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
 import { ConfigService } from '@nestjs/config'
 import { ThrottlerModule } from '@nestjs/throttler'
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import type { AppConfig } from '../../shared/config/configuration'
 import { UsersModule } from '../users/users.module'
+import { WorkspacesModule } from '../workspaces/workspaces.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { RefreshToken } from './entities/refresh-token.entity'
@@ -18,12 +20,26 @@ import { JwtStrategy } from './strategies/jwt.strategy'
 @Module({
   imports: [
     UsersModule,
-    ThrottlerModule.forRoot([
-      {
-        ttl: AUTH_THROTTLE_TTL_MS,
-        limit: AUTH_THROTTLE_MODULE_LIMIT,
+    WorkspacesModule,
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (cfg: ConfigService) => {
+        const redisUrl = cfg.get<AppConfig['redis']['url']>('app.redis.url', { infer: true })
+        const throttlers = [
+          {
+            ttl: AUTH_THROTTLE_TTL_MS,
+            limit: AUTH_THROTTLE_MODULE_LIMIT,
+          },
+        ]
+        if (redisUrl) {
+          return {
+            throttlers,
+            storage: new ThrottlerStorageRedisService(redisUrl),
+          }
+        }
+        return { throttlers }
       },
-    ]),
+    }),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     TypeOrmModule.forFeature([RefreshToken]),
     JwtModule.registerAsync({

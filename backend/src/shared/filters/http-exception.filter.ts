@@ -21,6 +21,14 @@ export class HttpExceptionFilter implements ExceptionFilter {
       const status = exception.getStatus()
       const res = exception.getResponse()
 
+      if (status >= 500) {
+        this.logger.error(
+          exception instanceof Error ? exception.stack : `http_exception status=${status}`,
+        )
+      } else if (status >= 400) {
+        this.logger.warn(`http_exception status=${status}`)
+      }
+
       if (typeof res === 'object' && res !== null && 'success' in res) {
         response.status(status).json(res)
         return
@@ -86,6 +94,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
     if (status === HttpStatus.TOO_MANY_REQUESTS) {
       return 'RATE_LIMITED'
+    }
+    if (status === HttpStatus.CONFLICT) {
+      return 'CONFLICT'
     }
     return 'HTTP_ERROR'
   }
