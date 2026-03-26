@@ -12,6 +12,8 @@ import { Workspace } from '../modules/workspaces/entities/workspace.entity'
 import { EventEntity } from '../modules/events/entities/event.entity'
 import { EventIdempotencyKey } from '../modules/events/entities/event-idempotency-key.entity'
 import { DailyEventAggregate } from '../modules/metrics/entities/daily-event-aggregate.entity'
+import { DatasourceEntity } from '../modules/datasources/entities/datasource.entity'
+import { WorkspaceDailyUsageEntity } from '../modules/cost/entities/workspace-daily-usage.entity'
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { DailyEventAggregate } from '../modules/metrics/entities/daily-event-agg
             EventEntity,
             EventIdempotencyKey,
             DailyEventAggregate,
+            DatasourceEntity,
+            WorkspaceDailyUsageEntity,
           ],
           migrations: [join(__dirname, 'migrations', '*.js')],
           migrationsRun: true,
