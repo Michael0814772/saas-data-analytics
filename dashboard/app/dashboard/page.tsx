@@ -1,14 +1,13 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { apiFetch, clearLocalSession } from "@/lib/api"
 import {
   createApiKey,
   listApiKeys,
   listWorkspaces,
-  login,
   refresh,
-  register,
   revokeApiKey,
   type ApiKeyListItem,
   type WorkspaceListItem,
@@ -53,6 +52,7 @@ const LS_REFRESH_TOKEN = "analytics_saas_refresh_token"
 const LS_WORKSPACE_ID = "analytics_saas_workspace_id"
 
 export default function DashboardPage() {
+  const router = useRouter()
   const today = useMemo(() => new Date(), [])
   const defaultTo = useMemo(() => toDateStr(today), [today])
   const defaultFrom = useMemo(() => {
@@ -60,10 +60,6 @@ export default function DashboardPage() {
     d.setUTCDate(d.getUTCDate() - 13)
     return toDateStr(d)
   }, [today])
-
-  const [mode, setMode] = useState<"login" | "register">("login")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
 
   const [accessToken, setAccessToken] = useState("")
   const [refreshToken, setRefreshToken] = useState("")
@@ -93,8 +89,9 @@ export default function DashboardPage() {
   const [createdInviteTokenOnce, setCreatedInviteTokenOnce] = useState<string | null>(null)
   const [transferNewOwnerUserId, setTransferNewOwnerUserId] = useState("")
   const [memberRoleEdits, setMemberRoleEdits] = useState<Record<string, string>>({})
+  const [bootstrapped, setBootstrapped] = useState(false)
 
-  const isAuthed = accessToken.trim() && refreshToken.trim()
+  const isAuthed = Boolean(accessToken.trim() && refreshToken.trim())
   const canRun = isAuthed && workspaceId.trim() && fromDate && toDate
 
   useEffect(() => {
@@ -112,6 +109,7 @@ export default function DashboardPage() {
         setWorkspaceId(savedWorkspaceId)
       }
     } catch {}
+    setBootstrapped(true)
   }, [])
 
   useEffect(() => {
@@ -151,29 +149,6 @@ export default function DashboardPage() {
     setError(null)
   }
 
-  const handleAuth = async () => {
-    if (!email.trim() || !password) {
-      setError("Email + password required")
-      return
-    }
-    setLoading(true)
-    setError(null)
-    try {
-      const data =
-        mode === "register"
-          ? await register({ email: email.trim(), password })
-          : await login({ email: email.trim(), password })
-      setAccessToken(data.accessToken)
-      setRefreshToken(data.refreshToken)
-      setPassword("")
-      setError(null)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Auth failed")
-    } finally {
-      setLoading(false)
-    }
-  }
-
   useEffect(() => {
     if (!isAuthed) {
       return
@@ -181,6 +156,15 @@ export default function DashboardPage() {
     void handleLoadWorkspaces()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthed])
+
+  useEffect(() => {
+    if (!bootstrapped) {
+      return
+    }
+    if (!isAuthed) {
+      router.replace("/login")
+    }
+  }, [bootstrapped, isAuthed, router])
 
   const handleLoadWorkspaces = async () => {
     if (!isAuthed) {
@@ -594,6 +578,10 @@ export default function DashboardPage() {
     return { label: `${sign}${pct.toFixed(1)}%`, tone }
   }, [growth])
 
+  if (!bootstrapped || !isAuthed) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_10%_10%,#e0f2fe_0%,#f8fafc_35%,#f1f5f9_100%)]">
       <div className="flex min-h-screen">
@@ -602,6 +590,7 @@ export default function DashboardPage() {
             workspaces.find((w) => w.id === workspaceId)?.name
           }
           active={view}
+          onLogout={handleLogout}
           onNavigate={(next) => {
             setView(next)
             if (next === "api-keys") {
@@ -691,129 +680,62 @@ export default function DashboardPage() {
 
           <div className="mx-auto max-w-6xl px-6 py-8">
             <div className="rounded-3xl border border-white/70 bg-white/75 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-          {!isAuthed ? (
-            <div className="grid gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-900">
-                  Sign in
-                </div>
-                <div className="flex gap-2">
+              <div className="grid gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-900">
+                    Workspace
+                  </div>
                   <button
-                    onClick={() => setMode("login")}
-                    className={`h-8 rounded-xl border px-3 text-xs font-semibold ${
-                      mode === "login"
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-200 bg-white text-slate-700"
-                    }`}
-                    aria-label="Switch to login"
+                    onClick={handleLogout}
+                    className="h-8 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
+                    aria-label="Logout"
                   >
-                    Login
-                  </button>
-                  <button
-                    onClick={() => setMode("register")}
-                    className={`h-8 rounded-xl border px-3 text-xs font-semibold ${
-                      mode === "register"
-                        ? "border-slate-900 bg-slate-900 text-white"
-                        : "border-slate-200 bg-white text-slate-700"
-                    }`}
-                    aria-label="Switch to register"
-                  >
-                    Register
+                    Logout
                   </button>
                 </div>
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-1">
-                  <span className="text-xs font-medium text-slate-700">Email</span>
-                  <input
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@company.com"
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400"
-                    aria-label="Email"
-                  />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-xs font-medium text-slate-700">Password</span>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="password"
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400"
-                    aria-label="Password"
-                  />
-                </label>
-              </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <label className="grid gap-1 md:col-span-2">
+                    <span className="text-xs font-medium text-slate-700">Select workspace</span>
+                    <select
+                      value={workspaceId}
+                      onChange={(e) => {
+                        const next = e.target.value
+                        setWorkspaceId(next)
+                        if (view === "workspace" && next.trim()) {
+                          void handleLoadWorkspaceManagement()
+                        }
+                      }}
+                      className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400"
+                      aria-label="Workspace select"
+                    >
+                      <option value="">Choose…</option>
+                      {workspaces.map((w) => (
+                        <option key={w.id} value={w.id}>
+                          {w.name} ({w.role})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-              <button
-                onClick={handleAuth}
-                disabled={loading}
-                className="h-10 rounded-xl bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-60"
-                aria-label="Submit auth"
-              >
-                {loading ? "Working…" : mode === "register" ? "Create account" : "Login"}
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-900">
-                  Workspace
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="h-8 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700"
-                  aria-label="Logout"
-                >
-                  Logout
-                </button>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-3">
-                <label className="grid gap-1 md:col-span-2">
-                  <span className="text-xs font-medium text-slate-700">Select workspace</span>
-                  <select
-                    value={workspaceId}
-                    onChange={(e) => {
-                      const next = e.target.value
-                      setWorkspaceId(next)
-                      if (view === "workspace" && next.trim()) {
-                        void handleLoadWorkspaceManagement()
-                      }
-                    }}
-                    className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none focus:border-slate-400"
-                    aria-label="Workspace select"
-                  >
-                    <option value="">Choose…</option>
-                    {workspaces.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.role})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <div className="flex items-end">
-                  <button
-                    onClick={handleLoadWorkspaces}
-                    disabled={loading}
-                    className="h-10 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    aria-label="Refresh workspace list"
-                  >
-                    {loading ? "Loading…" : "Refresh list"}
-                  </button>
+                  <div className="flex items-end">
+                    <button
+                      onClick={handleLoadWorkspaces}
+                      disabled={loading}
+                      className="h-10 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label="Refresh workspace list"
+                    >
+                      {loading ? "Loading…" : "Refresh list"}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
 
-          {error ? (
+              {error ? (
             <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
               {error}
             </div>
-          ) : null}
+              ) : null}
             </div>
 
             {view === "overview" ? (
