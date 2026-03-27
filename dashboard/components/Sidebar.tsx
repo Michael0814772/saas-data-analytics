@@ -2,13 +2,15 @@ export const Sidebar = ({
   workspaceName,
   active,
   onNavigate,
+  onLogout,
 }: {
   workspaceName?: string
   active: "overview" | "api-keys" | "workspace"
   onNavigate: (next: "overview" | "api-keys" | "workspace") => void
+  onLogout: () => void
 }) => {
   return (
-    <aside className="hidden w-72 flex-col border-r border-slate-200 bg-white md:flex">
+    <aside className="sticky top-0 hidden h-screen w-72 shrink-0 overflow-hidden flex-col border-r border-slate-200 bg-white md:flex">
       <div className="px-6 py-5">
         <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
           Analytics SaaS
@@ -65,11 +67,20 @@ export const Sidebar = ({
         </button>
       </nav>
 
-      <div className="mt-auto border-t border-slate-200 px-6 py-4 text-xs text-slate-500">
-        API{" "}
-        <span className="font-mono text-[11px] text-slate-700">
-          {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"}
-        </span>
+      <div className="mt-auto border-t border-slate-200 px-3 py-4">
+        <button
+          onClick={onLogout}
+          className="mb-3 h-10 w-full rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+          aria-label="Logout"
+        >
+          Logout
+        </button>
+        <div className="px-3 text-xs text-slate-500">
+          API{" "}
+          <span className="font-mono text-[11px] text-slate-700">
+            {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000"}
+          </span>
+        </div>
       </div>
     </aside>
   )
